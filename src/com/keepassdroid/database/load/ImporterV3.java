@@ -19,6 +19,10 @@
  *
 
 Derived from
+<<<<<<< HEAD
+=======
+
+>>>>>>> bpellin
 KeePass for J2ME
 
 Copyright 2007 Naomaru Itoi <nao@phoneid.org>
@@ -149,7 +153,7 @@ public class ImporterV3 extends Importer {
 			throw new InvalidDBSignatureException();
 		}
 
-		if( hdr.version != PwDbHeaderV3.DBVER_DW ) {
+		if( !hdr.matchesVersion() ) {
 			throw new InvalidDBVersionException();
 		}
 

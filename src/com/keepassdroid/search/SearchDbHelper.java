@@ -20,10 +20,8 @@
 package com.keepassdroid.search;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.Iterator;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -43,6 +41,7 @@ import com.keepassdroid.database.PwGroupV3;
 import com.keepassdroid.database.PwGroupV4;
 
 public class SearchDbHelper {
+
 	private static final String DATABASE_NAME = "search";
 	private static final String SEARCH_TABLE = "entries";
 	private static final int DATABASE_VERSION = 3;
@@ -68,30 +67,8 @@ public class SearchDbHelper {
 	
 	private static final String PRAGMA_NO_SYNCHRONOUS = "pragma synchronous = off;";
 	
+
 	private final Context mCtx;
-	private DatabaseHelper mDbHelper;
-	private SQLiteDatabase mDb;
-	
-	private static class DatabaseHelper extends SQLiteOpenHelper {
-		
-		DatabaseHelper(Context ctx) {
-			super(ctx, DATABASE_NAME, null, DATABASE_VERSION);
-		}
-
-		@Override
-		public void onCreate(SQLiteDatabase db) {
-			db.execSQL(DATABASE_CREATE);
-		}
-
-		@Override
-		public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-			if (oldVersion != DATABASE_VERSION) {
-				db.execSQL(DATABASE_DROP);
-				db.execSQL(DATABASE_CREATE);
-			}
-		}
-		
-	}
 	
 	public SearchDbHelper(Context ctx) {
 		mCtx = ctx;
@@ -150,18 +127,15 @@ public class SearchDbHelper {
 	public void updateEntry(PwEntry entry) {
 		ContentValues cv = buildNewEntryContent(entry);
 		String uuidStr = cv.getAsString(KEY_UUID);
+
+	private boolean omitBackup() {
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mCtx);
+		return prefs.getBoolean(mCtx.getString(R.string.omitbackup_key), mCtx.getResources().getBoolean(R.bool.omitbackup_default));
 		
-		mDb.update(SEARCH_TABLE, cv, KEY_UUID + " = ?", new String[] {uuidStr});
-	}
-	
-	public void deleteEntry(PwEntry entry) {
-		UUID uuid = entry.getUUID();
-		String uuidStr = uuid.toString();
-		
-		mDb.delete(SEARCH_TABLE, KEY_UUID + " = ?", new String[] {uuidStr});
 	}
 	
 	public PwGroup search(Database db, String qStr) {
+
 		Cursor cursor;
 		String queryWithWildCard = addWildCard(qStr);
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mCtx);
@@ -182,32 +156,25 @@ public class SearchDbHelper {
 		group.name = "Search results";
 		group.childEntries = new ArrayList<PwEntry>();
 		
-		cursor.moveToFirst();
-		while ( ! cursor.isAfterLast() ) {
-			String sUUID = cursor.getString(0);
-			UUID uuid = UUID.fromString(sUUID);
-			Log.d("TAG", uuid.toString()); 
-			PwEntry entry = (PwEntry) db.entries.get(uuid);
-			group.childEntries.add(entry);
+		// Search all entries
+		qStr = qStr.toLowerCase();
+		boolean isOmitBackup = omitBackup();
+		for (PwEntry entry : db.pm.getEntries()) {
 			
-			cursor.moveToNext();
+			if (!isOmitBackup || !db.pm.isBackup(entry.getParent())) {
+				// Search all strings in the entry
+				Iterator<String> iter = entry.stringIterator();
+				while (iter.hasNext()) {
+					String str = iter.next().toLowerCase();
+					if (str.contains(qStr)) {
+						group.childEntries.add(entry);
+						break;
+					}
+				}
+			}
+			
 		}
-		
-		cursor.close();
 		
 		return group;
 	}
-
-	private String addWildCard(String qStr) {
-		String result = new String(qStr);
-		if (qStr.endsWith("\"") || qStr.endsWith("*")) {
-			// Do Nothing
-		}
-		else if (qStr.endsWith("%")){
-			result = result.substring(0, result.length()-1);
-		}
-		result = result + "*";
-		return result;
-	}
-	
 }
