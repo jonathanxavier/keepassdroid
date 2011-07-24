@@ -3,9 +3,3 @@ local.properties
 bin
 gen
 obj
-
-src/com/keepassdroid/database/edit/BuildIndex.java
-
-src/com/keepassdroid/database/load/ImporterV3.java
-
-src/com/keepassdroid/database/load/ImporterV3.java
